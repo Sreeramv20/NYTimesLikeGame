@@ -1,12 +1,29 @@
 import { PuzzleCandidate } from '../types';
+import { getRecentPuzzles, formatPuzzlesForPrompt, getUsedAnchorPairs, getUsedAnswers } from '../puzzles/puzzleHistory';
 
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '';
 const OPENAI_API_URL = process.env.OPENAI_API_URL || 'https://api.openai.com/v1/chat/completions';
 
 export async function generateCandidates(count: number = 20): Promise<PuzzleCandidate[]> {
-  if (!OPENAI_API_KEY) {
-    return getFallbackCandidates();
+  if (!OPENAI_API_KEY || OPENAI_API_KEY === 'your_openai_api_key_here') {
+    throw new Error('OPENAI_API_KEY is required. Please set it in your .env.local file.');
   }
+  
+  console.log('[AI] Using OpenAI API to generate candidates');
+
+  // Get recent puzzles to avoid duplicates
+  const recentPuzzles = await getRecentPuzzles(50);
+  const previousPuzzlesText = formatPuzzlesForPrompt(recentPuzzles);
+  const usedAnchorPairs = getUsedAnchorPairs(recentPuzzles);
+  const usedAnswers = getUsedAnswers(recentPuzzles);
+  
+  // Create explicit lists for the prompt
+  const usedAnchorsList = Array.from(usedAnchorPairs).slice(0, 50).map(pair => {
+    const [a, b] = pair.split('|');
+    return `${a} — ${b}`;
+  }).join(', ');
+  
+  const usedAnswersList = Array.from(usedAnswers).slice(0, 30).join(', ');
 
   const prompt = `Generate exactly ${count} "Between" puzzles. Each puzzle must have:
 - Two anchor concepts (Anchor A and Anchor B) that form a clear spectrum or ordering
@@ -22,6 +39,15 @@ Rules:
 6. IMPORTANT: Each answer word must be UNIQUE - no two puzzles should have the same answer
 7. Each anchor pair should also be unique - avoid duplicate anchor combinations
 
+CRITICAL - DO NOT REUSE:
+8. NEVER use these anchor pairs (in any order): ${usedAnchorsList || 'None yet'}
+9. NEVER use these answers: ${usedAnswersList || 'None yet'}
+
+Previously used puzzles (for reference - avoid similar concepts):
+${previousPuzzlesText || 'No previous puzzles.'}
+
+You MUST create completely new anchor pairs and answers that are NOT in the lists above.
+
 Format your response as a JSON array of objects with this exact structure:
 [
   {
@@ -36,6 +62,9 @@ Format your response as a JSON array of objects with this exact structure:
 Return ONLY the JSON array, no other text.`;
 
   try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 25000); // 25 second timeout
+
     const response = await fetch(OPENAI_API_URL, {
       method: 'POST',
       headers: {
@@ -57,56 +86,58 @@ Return ONLY the JSON array, no other text.`;
         temperature: 0.7,
         max_tokens: 2000,
       }),
+      signal: controller.signal,
     });
 
+    clearTimeout(timeoutId);
+
     if (!response.ok) {
-      console.error('AI API error:', response.statusText);
-      return getFallbackCandidates();
+      const errorText = await response.text().catch(() => response.statusText);
+      console.error('[AI] API error:', response.status, errorText);
+      throw new Error(`OpenAI API error: ${response.status} ${errorText}`);
     }
 
     const data = await response.json();
     const content = data.choices[0]?.message?.content || '';
     
+    if (!content) {
+      throw new Error('Empty response from OpenAI API');
+    }
+    
     const jsonMatch = content.match(/\[[\s\S]*\]/);
     if (!jsonMatch) {
-      return getFallbackCandidates();
+      console.error('[AI] No JSON array found in response:', content.substring(0, 200));
+      throw new Error('Invalid response format from OpenAI API - expected JSON array');
     }
 
-    const candidates = JSON.parse(jsonMatch[0]) as PuzzleCandidate[];
-    return candidates.filter(c => 
+    let candidates: PuzzleCandidate[];
+    try {
+      candidates = JSON.parse(jsonMatch[0]) as PuzzleCandidate[];
+    } catch (parseError) {
+      console.error('[AI] JSON parse error:', parseError);
+      throw new Error('Failed to parse JSON response from OpenAI API');
+    }
+
+    const filtered = candidates.filter(c => 
       c.anchorA && 
       c.anchorB && 
       c.answer && 
       c.category
     );
-  } catch (error) {
-    console.error('Error generating candidates:', error);
-    return getFallbackCandidates();
-  }
-}
 
-function getFallbackCandidates(): PuzzleCandidate[] {
-  return [
-    { anchorA: 'Cold', anchorB: 'Hot', answer: 'Warm', category: 'temperature' },
-    { anchorA: 'Bicycle', anchorB: 'Car', answer: 'Motorcycle', category: 'vehicle' },
-    { anchorA: 'Whisper', anchorB: 'Shout', answer: 'Talk', category: 'volume' },
-    { anchorA: 'Seed', anchorB: 'Tree', answer: 'Plant', category: 'lifecycle' },
-    { anchorA: 'Tiny', anchorB: 'Huge', answer: 'Medium', category: 'size' },
-    { anchorA: 'Dawn', anchorB: 'Dusk', answer: 'Noon', category: 'time' },
-    { anchorA: 'Infant', anchorB: 'Elder', answer: 'Adult', category: 'age' },
-    { anchorA: 'Freeze', anchorB: 'Boil', answer: 'Melt', category: 'temperature' },
-    { anchorA: 'Walk', anchorB: 'Run', answer: 'Jog', category: 'speed' },
-    { anchorA: 'Empty', anchorB: 'Full', answer: 'Half', category: 'quantity' },
-    { anchorA: 'Start', anchorB: 'End', answer: 'Middle', category: 'position' },
-    { anchorA: 'Dark', anchorB: 'Light', answer: 'Dim', category: 'brightness' },
-    { anchorA: 'Quiet', anchorB: 'Loud', answer: 'Moderate', category: 'volume' },
-    { anchorA: 'Slow', anchorB: 'Fast', answer: 'Medium', category: 'speed' },
-    { anchorA: 'Small', anchorB: 'Large', answer: 'Medium', category: 'size' },
-    { anchorA: 'Few', anchorB: 'Many', answer: 'Some', category: 'quantity' },
-    { anchorA: 'Low', anchorB: 'High', answer: 'Medium', category: 'height' },
-    { anchorA: 'Thin', anchorB: 'Thick', answer: 'Medium', category: 'width' },
-    { anchorA: 'Easy', anchorB: 'Hard', answer: 'Medium', category: 'difficulty' },
-    { anchorA: 'Rare', anchorB: 'Common', answer: 'Uncommon', category: 'frequency' },
-  ];
+    if (filtered.length === 0) {
+      throw new Error('No valid candidates found in OpenAI response');
+    }
+
+    console.log(`[AI] Generated ${filtered.length} valid candidates`);
+    return filtered;
+  } catch (error) {
+    console.error('[AI] Error generating candidates:', error);
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new Error('OpenAI API request timed out after 25 seconds');
+    }
+    // Re-throw the error instead of falling back
+    throw error;
+  }
 }
 

@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { DailyPuzzle, GameState, RoundResult, PlayerStats } from '@/lib/types';
-import { checkAnswer } from '@/lib/puzzles/dailyPuzzle';
-import { getStats, updateStatsForGame, getCachedPuzzle, cachePuzzle, hasSeenIntro, markIntroSeen } from '@/lib/storage';
+import { checkAnswer } from '@/lib/puzzles/answerUtils';
+import { getStats, updateStatsForGame, getCachedPuzzle, cachePuzzle, hasSeenIntro, markIntroSeen, clearCachedPuzzle } from '@/lib/storage';
 import AnchorPair from '@/components/AnchorPair';
 import AnswerInput from '@/components/AnswerInput';
 import RoundIndicator from '@/components/RoundIndicator';
@@ -35,22 +35,45 @@ export default function Home() {
     loadPuzzle();
   }, []);
 
-  async function loadPuzzle() {
+  async function loadPuzzle(forceRefresh: boolean = false) {
     setLoading(true);
     try {
       const today = new Date().toISOString().split('T')[0];
+      
+      if (forceRefresh) {
+        clearCachedPuzzle(today);
+      }
+      
       const cached = getCachedPuzzle(today);
       
       let dailyPuzzle;
-      if (cached) {
+      if (cached && !forceRefresh) {
         dailyPuzzle = cached;
       } else {
-        const response = await fetch(`/api/puzzle?date=${today}`);
+        console.log('[Client] Fetching puzzle from API...');
+        const response = await fetch(`/api/puzzle?date=${today}`, {
+          signal: AbortSignal.timeout(30000), // 30 second timeout
+        });
+        
         if (!response.ok) {
-          throw new Error('Failed to load puzzle');
+          const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+          console.error('[Client] API error:', errorData);
+          throw new Error(errorData.error || 'Failed to load puzzle');
         }
-        dailyPuzzle = await response.json();
+        
+        const data = await response.json();
+        console.log('[Client] Received puzzle:', data);
+        
+        if (!data || !data.rounds || !Array.isArray(data.rounds)) {
+          throw new Error('Invalid puzzle data format');
+        }
+        
+        dailyPuzzle = data;
         cachePuzzle(today, dailyPuzzle);
+      }
+
+      if (!dailyPuzzle || !dailyPuzzle.rounds || dailyPuzzle.rounds.length === 0) {
+        throw new Error('Invalid puzzle data received');
       }
 
       setPuzzle(dailyPuzzle);
@@ -67,6 +90,9 @@ export default function Home() {
       setFeedback('');
     } catch (error) {
       console.error('Error loading puzzle:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error('Full error:', error);
+      alert(`Error loading puzzle: ${errorMessage}. Please try again.`);
     } finally {
       setLoading(false);
     }
@@ -172,7 +198,10 @@ export default function Home() {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <p className="text-text-secondary">Loading puzzle...</p>
+        <div className="text-center">
+          <p className="text-text-secondary mb-2">Loading puzzle...</p>
+          <p className="text-text-secondary text-xs opacity-60">This may take a moment</p>
+        </div>
       </div>
     );
   }
@@ -222,12 +251,21 @@ export default function Home() {
               })}
             </p>
           </div>
-          <button
-            onClick={() => setShowStats(true)}
-            className="text-sm text-text-secondary hover:text-text-primary transition-colors tracking-wide"
-          >
-            Stats
-          </button>
+          <div className="flex gap-4 items-center">
+            <button
+              onClick={() => loadPuzzle(true)}
+              className="text-xs text-text-secondary hover:text-text-primary transition-colors tracking-wide"
+              title="Regenerate today's puzzle"
+            >
+              Refresh
+            </button>
+            <button
+              onClick={() => setShowStats(true)}
+              className="text-sm text-text-secondary hover:text-text-primary transition-colors tracking-wide"
+            >
+              Stats
+            </button>
+          </div>
         </div>
 
         <RoundIndicator

@@ -1,65 +1,48 @@
 import { DailyPuzzle, PuzzleRound } from '../types';
 import { generateCandidates } from '../ai/generateCandidates';
 import { selectBestPuzzles } from './selector';
-import { getCachedPuzzle, cachePuzzle } from '../storage';
+import { savePuzzleToHistory } from './puzzleHistory';
 
 export async function getDailyPuzzle(date: string = new Date().toISOString().split('T')[0]): Promise<DailyPuzzle> {
-  const cached = getCachedPuzzle(date);
-  if (cached) {
-    return cached;
-  }
-
+  const maxAttempts = 5;
   let attempts = 0;
-  let rounds: PuzzleRound[] = [];
+  let lastError: Error | null = null;
 
-  while (rounds.length < 5 && attempts < 3) {
+  while (attempts < maxAttempts) {
     attempts++;
-    const candidates = await generateCandidates(30);
+    console.log(`[Puzzle] Attempt ${attempts}/${maxAttempts} to generate puzzle for ${date}`);
     
     try {
-      rounds = selectBestPuzzles(candidates, 5);
-      break;
+      const candidates = await generateCandidates(30);
+      const rounds = await selectBestPuzzles(candidates, 5);
+      
+      const puzzle: DailyPuzzle = {
+        date,
+        rounds,
+      };
+
+      // Save to history for future reference
+      await savePuzzleToHistory(puzzle);
+
+      console.log(`[Puzzle] Successfully generated puzzle with ${rounds.length} rounds`);
+      return puzzle;
     } catch (error) {
-      if (attempts >= 3) {
-        rounds = getFallbackPuzzle().rounds;
-        break;
+      lastError = error instanceof Error ? error : new Error(String(error));
+      console.error(`[Puzzle] Attempt ${attempts} failed:`, lastError.message);
+      
+      if (attempts < maxAttempts) {
+        const delay = Math.min(1000 * attempts, 5000); // Exponential backoff, max 5s
+        console.log(`[Puzzle] Retrying in ${delay}ms...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
       }
     }
   }
 
-  const puzzle: DailyPuzzle = {
-    date,
-    rounds,
-  };
-
-  cachePuzzle(date, puzzle);
-  return puzzle;
+  // If we get here, all attempts failed
+  throw new Error(
+    `Failed to generate puzzle after ${maxAttempts} attempts. Last error: ${lastError?.message || 'Unknown error'}`
+  );
 }
 
-function getFallbackPuzzle(): DailyPuzzle {
-  return {
-    date: new Date().toISOString().split('T')[0],
-    rounds: [
-      { anchorA: 'Cold', anchorB: 'Hot', answer: 'warm', category: 'temperature' },
-      { anchorA: 'Bicycle', anchorB: 'Car', answer: 'motorcycle', category: 'vehicle' },
-      { anchorA: 'Whisper', anchorB: 'Shout', answer: 'talk', category: 'volume' },
-      { anchorA: 'Seed', anchorB: 'Tree', answer: 'plant', category: 'lifecycle' },
-      { anchorA: 'Tiny', anchorB: 'Huge', answer: 'medium', category: 'size' },
-    ],
-  };
-}
-
-export function normalizeAnswer(answer: string): string {
-  if (!answer) return '';
-  return answer.toLowerCase().trim();
-}
-
-export function checkAnswer(guess: string, correctAnswer: string): boolean {
-  if (!guess || !correctAnswer) return false;
-  
-  const normalizedGuess = normalizeAnswer(guess);
-  const normalizedCorrect = normalizeAnswer(correctAnswer);
-  
-  return normalizedGuess === normalizedCorrect;
-}
+// Answer checking functions moved to answerUtils.ts for client-side compatibility
 

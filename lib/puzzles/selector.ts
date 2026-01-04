@@ -1,10 +1,15 @@
 import { PuzzleCandidate, PuzzleRound } from '../types';
 import { validateCandidate, scoreCandidate } from './validator';
+import { getRecentPuzzles, getUsedAnchorPairs, getUsedAnswers } from './puzzleHistory';
 
-export function selectBestPuzzles(
+export async function selectBestPuzzles(
   candidates: PuzzleCandidate[],
   count: number = 5
-): PuzzleRound[] {
+): Promise<PuzzleRound[]> {
+  // Get history to filter out duplicates
+  const recentPuzzles = await getRecentPuzzles(50);
+  const usedAnchorPairs = getUsedAnchorPairs(recentPuzzles);
+  const usedAnswers = getUsedAnswers(recentPuzzles);
   const valid = candidates
     .filter(validateCandidate)
     .map(c => ({
@@ -19,8 +24,8 @@ export function selectBestPuzzles(
   }
 
   const selected: typeof valid = [];
-  const usedAnswers = new Set<string>();
-  const usedAnchors = new Set<string>();
+  const batchUsedAnswers = new Set<string>();
+  const batchUsedAnchors = new Set<string>();
 
   for (const candidate of valid) {
     if (selected.length >= count) break;
@@ -30,13 +35,16 @@ export function selectBestPuzzles(
     const anchorB = candidate.anchorB.toLowerCase().trim();
     const anchorPair = [anchorA, anchorB].sort().join('|');
 
-    if (
-      !usedAnswers.has(normalizedAnswer) &&
-      !usedAnchors.has(anchorPair)
-    ) {
-      usedAnswers.add(normalizedAnswer);
-      usedAnchors.add(anchorPair);
+    // Check against both history AND current batch
+    const isAnswerUsed = usedAnswers.has(normalizedAnswer) || batchUsedAnswers.has(normalizedAnswer);
+    const isAnchorPairUsed = usedAnchorPairs.has(anchorPair) || batchUsedAnchors.has(anchorPair);
+
+    if (!isAnswerUsed && !isAnchorPairUsed) {
+      batchUsedAnswers.add(normalizedAnswer);
+      batchUsedAnchors.add(anchorPair);
       selected.push(candidate);
+    } else {
+      console.log(`[Selector] Rejected duplicate: ${anchorA} — ${anchorB} → ${normalizedAnswer}`);
     }
   }
 

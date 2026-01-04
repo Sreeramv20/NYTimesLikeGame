@@ -17,7 +17,7 @@ A NYT-style daily puzzle game where players guess the concept that lies "between
 - **Language**: TypeScript
 - **Styling**: Tailwind CSS
 - **State Management**: React hooks
-- **AI**: OpenAI-compatible API (with fallback puzzles)
+- **AI**: OpenAI-compatible API (required)
 
 ## Setup
 
@@ -26,14 +26,13 @@ A NYT-style daily puzzle game where players guess the concept that lies "between
 npm install
 ```
 
-2. Set up environment variables (optional, for AI generation):
+2. Set up environment variables (required):
 ```bash
 # Create .env.local in the project root
 OPENAI_API_KEY=your_api_key_here
-OPENAI_API_URL=https://api.openai.com/v1/chat/completions
 ```
 
-**Note**: If no API key is provided, the game will use fallback puzzles. The game is fully playable without an API key.
+**Note**: An OpenAI API key is required. Puzzles are generated using AI - no hardcoded fallbacks.
 
 3. Run the development server:
 ```bash
@@ -105,7 +104,7 @@ npm run dev
 - ✅ Local stats tracking (streaks, win rate)
 - ✅ Clean, minimal UI
 - ✅ Share functionality
-- ✅ Fallback puzzles when AI unavailable
+- ✅ AI-generated puzzles (no hardcoded fallbacks)
 
 ## Future Enhancements
 

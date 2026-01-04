@@ -90,3 +90,18 @@ export function markIntroSeen(): void {
   localStorage.setItem(INTRO_SEEN_KEY, 'true');
 }
 
+export function clearCachedPuzzle(date?: string): void {
+  if (typeof window === 'undefined') return;
+  if (date) {
+    const cached = localStorage.getItem(PUZZLE_CACHE_KEY);
+    if (cached) {
+      const data = JSON.parse(cached);
+      if (data.date === date) {
+        localStorage.removeItem(PUZZLE_CACHE_KEY);
+      }
+    }
+  } else {
+    localStorage.removeItem(PUZZLE_CACHE_KEY);
+  }
+}
+
