@@ -37,19 +37,18 @@ export default function Home() {
       const today = new Date().toISOString().split('T')[0];
       const cached = getCachedPuzzle(today);
       
+      let dailyPuzzle;
       if (cached) {
-        setPuzzle(cached);
-        setLoading(false);
-        return;
+        dailyPuzzle = cached;
+      } else {
+        const response = await fetch(`/api/puzzle?date=${today}`);
+        if (!response.ok) {
+          throw new Error('Failed to load puzzle');
+        }
+        dailyPuzzle = await response.json();
+        cachePuzzle(today, dailyPuzzle);
       }
 
-      const response = await fetch(`/api/puzzle?date=${today}`);
-      if (!response.ok) {
-        throw new Error('Failed to load puzzle');
-      }
-      
-      const dailyPuzzle = await response.json();
-      cachePuzzle(today, dailyPuzzle);
       setPuzzle(dailyPuzzle);
       setGameState({
         currentRound: 0,
@@ -99,15 +98,18 @@ export default function Home() {
         updateStatsForGame(true);
         setStats(getStats());
       } else {
-        setGameState({
-          ...gameState,
-          currentRound: gameState.currentRound + 1,
-          attempts: 2,
-          guesses: [],
-        });
-        setResults(newResults);
-        setCurrentGuess('');
-        setFeedback('');
+        setFeedback('Correct');
+        setTimeout(() => {
+          setGameState({
+            ...gameState,
+            currentRound: gameState.currentRound + 1,
+            attempts: 2,
+            guesses: [],
+          });
+          setResults(newResults);
+          setCurrentGuess('');
+          setFeedback('');
+        }, 800);
       }
     } else if (newAttempts === 0) {
       const newResult: RoundResult = {
@@ -133,7 +135,7 @@ export default function Home() {
         attempts: newAttempts,
         guesses: newGuesses,
       });
-      setFeedback('Not quite — try again');
+      setFeedback('Not quite');
       setCurrentGuess('');
     }
   }
@@ -142,11 +144,15 @@ export default function Home() {
     if (!puzzle) return;
 
     const solved = results.filter(r => r.solved).length;
-    const emoji = gameState.isComplete ? '🎉' : '😔';
-    const text = `Between ${new Date().toLocaleDateString()}\n${emoji} ${solved}/${puzzle.rounds.length} rounds solved\n\nPlay at: ${window.location.href}`;
+    const date = new Date().toLocaleDateString('en-US', {
+      month: 'long',
+      day: 'numeric',
+      year: 'numeric',
+    });
+    const text = `Between ${date}\n${solved}/${puzzle.rounds.length} rounds solved\n\nPlay at: ${window.location.href}`;
 
     navigator.clipboard.writeText(text).then(() => {
-      alert('Results copied to clipboard!');
+      // Silent success - no alert needed for premium feel
     });
   }
 
@@ -157,7 +163,7 @@ export default function Home() {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <p className="text-gray-600">Loading puzzle...</p>
+        <p className="text-text-secondary">Loading puzzle...</p>
       </div>
     );
   }
@@ -165,7 +171,7 @@ export default function Home() {
   if (!puzzle) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <p className="text-red-600">Error loading puzzle. Please refresh.</p>
+        <p className="text-text-secondary">Error loading puzzle. Please refresh.</p>
       </div>
     );
   }
@@ -176,7 +182,7 @@ export default function Home() {
       : 0;
 
     return (
-      <div className="min-h-screen py-12 px-4">
+      <div className="min-h-screen py-16 px-4">
         <EndScreen
           puzzle={puzzle}
           results={results}
@@ -191,12 +197,14 @@ export default function Home() {
   const currentRoundData = puzzle.rounds[gameState.currentRound];
 
   return (
-    <div className="min-h-screen py-12 px-4">
-      <div className="max-w-2xl mx-auto">
-        <div className="flex justify-between items-center mb-8">
+    <div className="min-h-screen py-16 px-4">
+      <div className="max-w-lg mx-auto">
+        <div className="flex justify-between items-start mb-16">
           <div>
-            <h1 className="text-4xl font-serif text-gray-900 mb-2">Between</h1>
-            <p className="text-sm text-gray-500">
+            <h1 className="text-4xl font-serif text-text-primary mb-3 tracking-wide">
+              Between
+            </h1>
+            <p className="text-sm text-text-secondary tracking-wide">
               {new Date().toLocaleDateString('en-US', {
                 weekday: 'long',
                 year: 'numeric',
@@ -207,7 +215,7 @@ export default function Home() {
           </div>
           <button
             onClick={() => setShowStats(true)}
-            className="text-sm text-gray-600 hover:text-gray-900 underline"
+            className="text-sm text-text-secondary hover:text-text-primary transition-colors tracking-wide"
           >
             Stats
           </button>
@@ -224,6 +232,7 @@ export default function Home() {
         />
 
         <AnswerInput
+          key={gameState.currentRound}
           value={currentGuess}
           onChange={setCurrentGuess}
           onSubmit={handleSubmit}

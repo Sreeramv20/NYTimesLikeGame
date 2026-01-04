@@ -21,29 +21,40 @@ export default function EndScreen({ puzzle, results, timeTaken, onShare, onNewGa
   };
 
   return (
-    <div className="max-w-2xl mx-auto text-center">
-      <h2 className="text-3xl font-serif text-gray-900 mb-4">
-        {failed ? 'Game Over' : 'Congratulations!'}
-      </h2>
-      <p className="text-gray-600 mb-6">
-        You solved {solved} of {puzzle.rounds.length} rounds
-      </p>
-      <p className="text-sm text-gray-500 mb-8">Time: {formatTime(timeTaken)}</p>
+    <div className="max-w-lg mx-auto">
+      <div className="text-center mb-16">
+        <h2 className="text-3xl font-serif text-text-primary mb-4 tracking-wide">
+          {failed ? 'Completed' : 'Nice work'}
+        </h2>
+        <p className="text-text-secondary mb-2">
+          You solved {solved} of {puzzle.rounds.length} rounds
+        </p>
+        <p className="text-sm text-text-secondary opacity-60">Time: {formatTime(timeTaken)}</p>
+      </div>
 
-      <div className="space-y-4 mb-8">
+      <div className="space-y-6 mb-16">
         {results.map((result, idx) => (
-          <div key={idx} className="border-b border-gray-200 pb-4">
-            <div className="flex justify-between items-center mb-2">
-              <span className="text-gray-700">
-                Round {idx + 1}: {puzzle.rounds[idx].anchorA} — {puzzle.rounds[idx].anchorB}
-              </span>
-              <span className={result.solved ? 'text-green-600' : 'text-red-600'}>
-                {result.solved ? '✓' : '✗'}
+          <div key={idx} className="border-b border-divider pb-6 last:border-0">
+            <div className="flex justify-between items-start mb-3">
+              <div className="flex-1">
+                <p className="text-text-secondary text-sm mb-1 tracking-wide">
+                  Round {idx + 1}
+                </p>
+                <p className="text-text-primary font-serif text-lg">
+                  {puzzle.rounds[idx].anchorA} — {puzzle.rounds[idx].anchorB}
+                </p>
+              </div>
+              <span
+                className={`ml-4 ${
+                  result.solved ? 'text-accent' : 'text-text-secondary opacity-40'
+                }`}
+              >
+                {result.solved ? '✓' : '—'}
               </span>
             </div>
-            {!result.solved && (
-              <p className="text-sm text-gray-500">
-                Answer: <span className="font-serif">{result.correctAnswer}</span>
+            {!result.solved && result.correctAnswer && (
+              <p className="text-sm text-text-secondary">
+                Answer: <span className="font-serif text-text-primary">{result.correctAnswer}</span>
               </p>
             )}
           </div>
@@ -53,13 +64,13 @@ export default function EndScreen({ puzzle, results, timeTaken, onShare, onNewGa
       <div className="flex gap-4 justify-center">
         <button
           onClick={onShare}
-          className="px-6 py-2 border border-gray-300 rounded hover:bg-gray-50 transition-colors"
+          className="px-8 py-3 border border-divider rounded-lg text-text-secondary hover:text-text-primary hover:border-text-secondary transition-colors"
         >
           Share
         </button>
         <button
           onClick={onNewGame}
-          className="px-6 py-2 bg-accent text-white rounded hover:bg-blue-600 transition-colors"
+          className="px-8 py-3 bg-accent text-text-primary rounded-lg hover:opacity-90 transition-opacity font-medium"
         >
           Play Again
         </button>

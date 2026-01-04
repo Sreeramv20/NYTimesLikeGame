@@ -3,6 +3,13 @@
 @tailwind utilities;
 
 body {
-  @apply bg-white text-gray-900;
+  @apply bg-bg-primary text-text-primary;
+  font-feature-settings: 'kern' 1;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  @apply border-divider;
 }
 
