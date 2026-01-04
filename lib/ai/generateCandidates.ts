@@ -19,6 +19,8 @@ Rules:
 3. Anchors should clearly imply an ordering (not synonyms)
 4. Use common vocabulary only - no obscure words
 5. The answer should be semantically equidistant from both anchors
+6. IMPORTANT: Each answer word must be UNIQUE - no two puzzles should have the same answer
+7. Each anchor pair should also be unique - avoid duplicate anchor combinations
 
 Format your response as a JSON array of objects with this exact structure:
 [

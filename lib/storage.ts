@@ -2,6 +2,7 @@ import { PlayerStats, DailyPuzzle } from './types';
 
 const STATS_KEY = 'between_stats';
 const PUZZLE_CACHE_KEY = 'between_puzzle_cache';
+const INTRO_SEEN_KEY = 'between_intro_seen';
 
 export function getStats(): PlayerStats {
   if (typeof window === 'undefined') {
@@ -77,5 +78,15 @@ export function getCachedPuzzle(date: string): DailyPuzzle | null {
 export function cachePuzzle(date: string, puzzle: DailyPuzzle): void {
   if (typeof window === 'undefined') return;
   localStorage.setItem(PUZZLE_CACHE_KEY, JSON.stringify({ date, puzzle }));
+}
+
+export function hasSeenIntro(): boolean {
+  if (typeof window === 'undefined') return false;
+  return localStorage.getItem(INTRO_SEEN_KEY) === 'true';
+}
+
+export function markIntroSeen(): void {
+  if (typeof window === 'undefined') return;
+  localStorage.setItem(INTRO_SEEN_KEY, 'true');
 }
 

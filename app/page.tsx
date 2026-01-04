@@ -3,12 +3,13 @@
 import { useState, useEffect } from 'react';
 import { DailyPuzzle, GameState, RoundResult, PlayerStats } from '@/lib/types';
 import { checkAnswer } from '@/lib/puzzles/dailyPuzzle';
-import { getStats, updateStatsForGame, getCachedPuzzle, cachePuzzle } from '@/lib/storage';
+import { getStats, updateStatsForGame, getCachedPuzzle, cachePuzzle, hasSeenIntro, markIntroSeen } from '@/lib/storage';
 import AnchorPair from '@/components/AnchorPair';
 import AnswerInput from '@/components/AnswerInput';
 import RoundIndicator from '@/components/RoundIndicator';
 import StatsModal from '@/components/StatsModal';
 import EndScreen from '@/components/EndScreen';
+import IntroModal from '@/components/IntroModal';
 
 export default function Home() {
   const [puzzle, setPuzzle] = useState<DailyPuzzle | null>(null);
@@ -25,9 +26,12 @@ export default function Home() {
   const [results, setResults] = useState<RoundResult[]>([]);
   const [stats, setStats] = useState<PlayerStats>(getStats());
   const [showStats, setShowStats] = useState(false);
+  const [showIntro, setShowIntro] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    const seenIntro = hasSeenIntro();
+    setShowIntro(!seenIntro);
     loadPuzzle();
   }, []);
 
@@ -160,6 +164,11 @@ export default function Home() {
     loadPuzzle();
   }
 
+  function handleCloseIntro() {
+    markIntroSeen();
+    setShowIntro(false);
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -246,6 +255,11 @@ export default function Home() {
         stats={stats}
         isOpen={showStats}
         onClose={() => setShowStats(false)}
+      />
+
+      <IntroModal
+        isOpen={showIntro}
+        onClose={handleCloseIntro}
       />
     </div>
   );

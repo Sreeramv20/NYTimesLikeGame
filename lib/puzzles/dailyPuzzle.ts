@@ -14,7 +14,7 @@ export async function getDailyPuzzle(date: string = new Date().toISOString().spl
 
   while (rounds.length < 5 && attempts < 3) {
     attempts++;
-    const candidates = await generateCandidates(20);
+    const candidates = await generateCandidates(30);
     
     try {
       rounds = selectBestPuzzles(candidates, 5);
@@ -50,10 +50,13 @@ function getFallbackPuzzle(): DailyPuzzle {
 }
 
 export function normalizeAnswer(answer: string): string {
+  if (!answer) return '';
   return answer.toLowerCase().trim();
 }
 
 export function checkAnswer(guess: string, correctAnswer: string): boolean {
+  if (!guess || !correctAnswer) return false;
+  
   const normalizedGuess = normalizeAnswer(guess);
   const normalizedCorrect = normalizeAnswer(correctAnswer);
   
